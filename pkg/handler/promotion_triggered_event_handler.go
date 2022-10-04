@@ -2,16 +2,7 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"github.com/keptn/go-utils/pkg/api/models"
-	api "github.com/keptn/go-utils/pkg/api/utils"
-	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
-	logger "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	promotionconfig "keptn/git-promotion-service/pkg/config"
 	"keptn/git-promotion-service/pkg/model"
 	"keptn/git-promotion-service/pkg/promoter"
@@ -19,6 +10,17 @@ import (
 	"keptn/git-promotion-service/pkg/repoaccess"
 	"os"
 	"strings"
+
+	keptn_interface "keptn-contrib/git-promotion-service/pkg/keptn"
+
+	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/keptn/go-utils/pkg/api/models"
+	api "github.com/keptn/go-utils/pkg/api/utils/v2"
+	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
+	logger "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 const GitPromotionTaskName = "git-promotion"
@@ -185,28 +187,42 @@ func (a *GitPromotionTriggeredEventHandler) getAccessToken(secretName string) (a
 }
 
 func (a *GitPromotionTriggeredEventHandler) getNextStage(project string, stage string) (nextStage string, err error) {
-	stages, err := a.api.StagesV1().GetAllStages(project)
-	if err != nil {
-		logger.WithField("func", "getNextStage").WithError(err).Errorf("could not get all stages for project %s with stage %s", project, stage)
-		return nextStage, err
-	}
-	for i, s := range stages {
-		if s.StageName == stage {
-			if len(stages) <= (i + 1) {
-				err = errors.New(fmt.Sprintf("no stage defined after stage %s", stage))
-				logger.WithField("func", "getNextStage").WithError(err).Errorf("no next stage found for project %s with stage %s", project, stage)
-				return nextStage, err
-			}
-			logger.WithField("func", "getNextStage").Infof("next stage %s found for project %s and stage %s", stages[i+1].StageName, project, stage)
-			return stages[i+1].StageName, nil
-		}
-	}
-	err = errors.New(fmt.Sprintf("stage %s not found", stage))
-	logger.WithField("func", "getNextStage").WithError(err).Errorf("stage %s not found for project %s", stage, project)
-	return nextStage, err
+	// stages, err := a.api.Stages().GetAllStages(ctx, project)
+	// if err != nil {
+	// 	logger.WithField("func", "getNextStage").WithError(err).Errorf("could not get all stages for project %s with stage %s", project, stage)
+	// 	return nextStage, err
+	// }
+	// for i, s := range stages {
+	// 	if s.StageName == stage {
+	// 		if len(stages) <= (i + 1) {
+	// 			err = errors.New(fmt.Sprintf("no stage defined after stage %s", stage))
+	// 			logger.WithField("func", "getNextStage").WithError(err).Errorf("no next stage found for project %s with stage %s", project, stage)
+	// 			return nextStage, err
+	// 		}
+	// 		logger.WithField("func", "getNextStage").Infof("next stage %s found for project %s and stage %s", stages[i+1].StageName, project, stage)
+	// 		return stages[i+1].StageName, nil
+	// 	}
+	// }
+	// err = errors.New(fmt.Sprintf("stage %s not found", stage))
+	// logger.WithField("func", "getNextStage").WithError(err).Errorf("stage %s not found for project %s", stage, project)
+	// return nextStage, err
+	return "production", err
 }
 
 func (a *GitPromotionTriggeredEventHandler) getMergedConfiguration(project string, stage, nextstage string, service string) (config model.PromotionConfig) {
+	data := &keptnv2.EventData{}
+	if err := keptnv2.Decode(event.Data, data); err != nil {
+		keptnHandle.Logger().Errorf("Could not parse event: %s", err.Error())
+		return false
+	}
+
+	jcr := &config.JobConfigReader{
+		Keptn: keptn_interface.NewV1ResourceHandler(*data, keptnHandle.APIV2().Resources()),
+	}
+
+	// Check if the job configuration can be found
+	configuration, _, err := jcr.GetJobConfig(event.GitCommitID)
+
 	config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
 		return a.api.ResourcesV1().GetProjectResource(project, configurationResource)
 	})
