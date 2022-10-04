@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"fmt"
 	"keptn/git-promotion-service/pkg/handler"
 	"log"
 	"os"
@@ -11,22 +10,35 @@ import (
 	"sync"
 	"syscall"
 
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/kelseyhightower/envconfig"
 	logger "github.com/sirupsen/logrus"
 
-	api "github.com/keptn/go-utils/pkg/api/utils"
 	keptnapi "github.com/keptn/go-utils/pkg/api/utils"
+	api "github.com/keptn/go-utils/pkg/api/utils/v2"
+	"github.com/keptn/go-utils/pkg/lib/keptn"
 	keptncommon "github.com/keptn/go-utils/pkg/lib/keptn"
 	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
 )
 
+var keptnOptions = keptn.KeptnOpts{}
+var env envConfig
+
 const envVarLogLevel = "LOG_LEVEL"
+const ServiceName = "git-promotion-service"
 
 type envConfig struct {
 	// Port on which to listen for cloudevents
-	Port int    `envconfig:"RCV_PORT" default:"8080"`
+	Port int `envconfig:"RCV_PORT" default:"8080"`
+	// RVC Path
 	Path string `envconfig:"RCV_PATH" default:"/"`
+	// URL of the Keptn API Endpoint
+	KeptnAPIURL string `envconfig:"KEPTN_API_URL" required:"true"`
+	// The token of the keptn API
+	KeptnAPIToken string `envconfig:"KEPTN_API_TOKEN" required:"true"`
 }
 
 // Opaque key type used for graceful shutdown context value
@@ -56,6 +68,8 @@ func main() {
 
 func _main(args []string, env envConfig) int {
 	ctx := getGracefulContext()
+
+	keptnOptions.ConfigurationServiceURL = fmt.Sprintf("%s/resource-service", env.KeptnAPIURL)
 
 	p, err := cloudevents.NewHTTP(cloudevents.WithPath(env.Path), cloudevents.WithPort(env.Port), cloudevents.WithGetHandlerFunc(keptnapi.HealthEndpointHandler))
 	if err != nil {

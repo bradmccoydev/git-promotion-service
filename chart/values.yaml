@@ -1,6 +1,9 @@
-imageKey:
+image:
   repository: ghcr.io/keptn-sandbox/git-promotion-service
   tag: latest
 pullPolicy: Always
-pubSubUrl: 'nats://keptn-nats'
 externalUrl: ~
+
+subscription:
+  pubSubUrl: 'nats://keptn-nats'
+  pubSubTopic: sh.keptn.event.git-promotion.>
