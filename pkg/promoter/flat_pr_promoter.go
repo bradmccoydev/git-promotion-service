@@ -3,11 +3,12 @@ package promoter
 import (
 	"errors"
 	"fmt"
-	logger "github.com/sirupsen/logrus"
 	"keptn/git-promotion-service/pkg/model"
 	"keptn/git-promotion-service/pkg/replacer"
 	"keptn/git-promotion-service/pkg/repoaccess"
 	"strings"
+
+	logger "github.com/sirupsen/logrus"
 )
 
 type FlatPrPromoter struct {

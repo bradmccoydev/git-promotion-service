@@ -3,22 +3,23 @@ package handler
 import (
 	"context"
 	"fmt"
-	promotionconfig "keptn/git-promotion-service/pkg/config"
+	"keptn/git-promotion-service/pkg/config"
+
+	//promotionconfig "keptn/git-promotion-service/pkg/config"
 	"keptn/git-promotion-service/pkg/model"
 	"keptn/git-promotion-service/pkg/promoter"
-	"keptn/git-promotion-service/pkg/replacer"
 	"keptn/git-promotion-service/pkg/repoaccess"
 	"os"
 	"strings"
-
-	keptn_interface "keptn-contrib/git-promotion-service/pkg/keptn"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/keptn/go-utils/pkg/api/models"
 	api "github.com/keptn/go-utils/pkg/api/utils/v2"
 	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
+	"github.com/keptn/go-utils/pkg/sdk"
 	logger "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -28,13 +29,19 @@ const keptnPullRequestTitlePrefix = "keptn:"
 const configurationResource = GitPromotionTaskName + ".yaml"
 
 type GitPromotionTriggeredEventHandler struct {
-	keptn      *keptnv2.Keptn
-	api        *api.APISet
-	kubeClient *kubernetes.Clientset
+	ServiceName string
+	keptn       *keptnv2.Keptn
+	api         *api.APISet
+	kubeClient  *kubernetes.Clientset
 }
 
 type GitPromotionTriggeredEventData struct {
 	keptnv2.EventData
+}
+
+// GitPromotionConfigReader retrieves the git promotion configuration
+type GitPromotionConfigReader interface {
+	GetGitPromotionConfig(gitCommitID string) (*config.PromotionConfig, string, error)
 }
 
 // NewGitPromotionTriggeredEventHandler returns a new GitPromotionTriggeredEventHandler
@@ -48,14 +55,14 @@ func (a *GitPromotionTriggeredEventHandler) IsTypeHandled(event cloudevents.Even
 }
 
 // Handle godoc
-func (a *GitPromotionTriggeredEventHandler) Handle(event cloudevents.Event, keptnHandler *keptnv2.Keptn) {
-	data := &GitPromotionTriggeredEventData{}
-	if err := event.DataAs(data); err != nil {
-		logger.WithError(err).Error("failed to parse GitPromotionTriggeredEventData")
-		return
-	}
-	outgoingEvents := a.handleGitPromotionTriggeredEvent(event, *data, event.Context.GetID(), keptnHandler.KeptnContext)
-	sendEvents(keptnHandler, outgoingEvents)
+func (eh *GitPromotionTriggeredEventHandler) Handle(event sdk.KeptnEvent, keptnHandler *keptnv2.Keptn) {
+	//data := &GitPromotionTriggeredEventData{}
+	// if err := event.DataAs(data); err != nil {
+	// 	logger.WithError(err).Error("failed to parse GitPromotionTriggeredEventData")
+	// 	return
+	// }
+	// outgoingEvents := eh.handleGitPromotionTriggeredEvent(event, *data, event.Context.GetID(), keptnHandler.KeptnContext)
+	// sendEvents(keptnHandler, outgoingEvents)
 }
 
 func (a *GitPromotionTriggeredEventHandler) handleGitPromotionTriggeredEvent(event cloudevents.Event, inputEvent GitPromotionTriggeredEventData,
@@ -66,59 +73,59 @@ func (a *GitPromotionTriggeredEventHandler) handleGitPromotionTriggeredEvent(eve
 		return []cloudevents.Event{*a.getGitPromotionFinishedEvent(inputEvent, keptnv2.StatusErrored, keptnv2.ResultFailed, "sending starting event failed", triggeredID, shkeptncontext, nil)}
 	}
 	outgoingEvents := make([]cloudevents.Event, 0)
-	var nextStage string
-	if nextStageTemp, err := a.getNextStage(inputEvent.Project, inputEvent.Stage); err != nil {
-		logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Error("handleGitPromotionTriggeredEvent: error while reading nextStage")
-		return []cloudevents.Event{*a.getGitPromotionFinishedEvent(inputEvent, keptnv2.StatusErrored, keptnv2.ResultFailed, "error while reading nextStage", triggeredID, shkeptncontext, nil)}
-	} else {
-		nextStage = nextStageTemp
-	}
-	config := a.getMergedConfiguration(inputEvent.GetProject(), inputEvent.GetStage(), nextStage, inputEvent.GetService())
-	logger.WithField("func", "handleGitPromotionTriggeredEvent").Infof("using git promotion config: strategy: %s, repository: %s, secret: %s", toString(config.Spec.Strategy), toString(config.Spec.Target.Repo), toString(config.Spec.Target.Secret))
+	//var nextStage string
+	// if nextStageTemp, err := a.getNextStage(inputEvent.Project, inputEvent.Stage); err != nil {
+	// 	logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Error("handleGitPromotionTriggeredEvent: error while reading nextStage")
+	// 	return []cloudevents.Event{*a.getGitPromotionFinishedEvent(inputEvent, keptnv2.StatusErrored, keptnv2.ResultFailed, "error while reading nextStage", triggeredID, shkeptncontext, nil)}
+	// } else {
+	// 	nextStage = nextStageTemp
+	// }
+	//config := a.getMergedConfiguration(keptnv2, inputEvent.GetProject(), inputEvent.GetStage(), nextStage, inputEvent.GetService())
+	//logger.WithField("func", "handleGitPromotionTriggeredEvent").Infof("using git promotion config: strategy: %s, repository: %s, secret: %s", toString(config.Spec.Strategy), toString(config.Spec.Target.Repo), toString(config.Spec.Target.Secret))
 	var status keptnv2.StatusType
 	var result keptnv2.ResultType
 	var message string
 	var prLink *string
-	if vs := promotionconfig.NewValidator().Validate(config); len(vs) > 0 {
-		logger.WithField("func", "handleGitPromotionTriggeredEvent").Errorf("validation of configuration failed: %s", strings.Join(vs, ","))
-		status = keptnv2.StatusErrored
-		result = keptnv2.ResultFailed
-		message = "validation error: " + strings.Join(vs, ",")
-	} else if accessToken, err := a.getAccessToken(*config.Spec.Target.Secret); err != nil {
-		logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Errorf("handleGitPromotionTriggeredEvent: error while reading secret with name %s", *config.Spec.Target.Secret)
-		status = keptnv2.StatusErrored
-		result = keptnv2.ResultFailed
-		message = "error while reading secret"
-	} else if client, err := repoaccess.NewClient(accessToken, *config.Spec.Target.Repo); err != nil {
-		logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Errorf("handleGitPromotionTriggeredEvent: error while creating client for repo")
-		status = keptnv2.StatusErrored
-		result = keptnv2.ResultFailed
-		message = "error while reading secret"
-	} else if *config.Spec.Strategy == model.StrategyBranch {
-		status, result, message, prLink = handleBranchStrategy(client, inputEvent, config, shkeptncontext, nextStage)
-	} else if *config.Spec.Strategy == model.StrategyFlatPR {
-		status, result, message, prLink = handleFlatPRStrategy(client, event, inputEvent, config, shkeptncontext, nextStage)
-	} else {
-		status = keptnv2.StatusErrored
-		result = keptnv2.ResultFailed
-		message = "unimplemented strategy"
-	}
+	// if vs := config.NewValidator().Validate(config); len(vs) > 0 {
+	// 	logger.WithField("func", "handleGitPromotionTriggeredEvent").Errorf("validation of configuration failed: %s", strings.Join(vs, ","))
+	// 	status = keptnv2.StatusErrored
+	// 	result = keptnv2.ResultFailed
+	// 	message = "validation error: " + strings.Join(vs, ",")
+	// } else if accessToken, err := a.getAccessToken(*config.Spec.Target.Secret); err != nil {
+	// 	logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Errorf("handleGitPromotionTriggeredEvent: error while reading secret with name %s", *config.Spec.Target.Secret)
+	// 	status = keptnv2.StatusErrored
+	// 	result = keptnv2.ResultFailed
+	// 	message = "error while reading secret"
+	// } else if client, err := repoaccess.NewClient(accessToken, *config.Spec.Target.Repo); err != nil {
+	// 	logger.WithField("func", "handleGitPromotionTriggeredEvent").WithError(err).Errorf("handleGitPromotionTriggeredEvent: error while creating client for repo")
+	// 	status = keptnv2.StatusErrored
+	// 	result = keptnv2.ResultFailed
+	// 	message = "error while reading secret"
+	// } else if *config.Spec.Strategy == model.StrategyBranch {
+	// 	status, result, message, prLink = handleBranchStrategy(client, inputEvent, config, shkeptncontext, nextStage)
+	// } else if *config.Spec.Strategy == model.StrategyFlatPR {
+	// 	status, result, message, prLink = handleFlatPRStrategy(client, event, inputEvent, config, shkeptncontext, nextStage)
+	// } else {
+	// 	status = keptnv2.StatusErrored
+	// 	result = keptnv2.ResultFailed
+	// 	message = "unimplemented strategy"
+	// }
 	finishedEvent := a.getGitPromotionFinishedEvent(inputEvent, status, result, message, triggeredID, shkeptncontext, prLink)
 	outgoingEvents = append(outgoingEvents, *finishedEvent)
 	return outgoingEvents
 }
 
 func handleFlatPRStrategy(client repoaccess.Client, event cloudevents.Event, inputEvent GitPromotionTriggeredEventData, config model.PromotionConfig, shkeptncontext, nextStage string) (status keptnv2.StatusType, result keptnv2.ResultType, message string, prLink *string) {
-	p := promoter.NewFlatPrPromoter(client)
-	if msg, prlink, err := p.Promote(*config.Spec.Target.Repo, replacer.ConvertToMap(event), "main",
-		buildBranchName(inputEvent.Stage, nextStage, shkeptncontext),
-		buildTitle(shkeptncontext, nextStage),
-		buildBody(shkeptncontext, inputEvent.Project, inputEvent.Service, inputEvent.Stage), config.Spec.Paths); err != nil {
-		logger.WithField("func", "handleFlatPRStrategy").WithError(err).Errorf("flat pr strategy failed on repository %s", *config.Spec.Target.Repo)
-		return keptnv2.StatusErrored, keptnv2.ResultFailed, "error while opening pull request", nil
-	} else {
-		return keptnv2.StatusSucceeded, keptnv2.ResultPass, msg, prlink
-	}
+	// p := promoter.NewFlatPrPromoter(client)
+	// if msg, prlink, err := p.Promote(*config.Spec.Target.Repo, replacer.ConvertToMap(event), "main",
+	// 	buildBranchName(inputEvent.Stage, nextStage, shkeptncontext),
+	// 	buildTitle(shkeptncontext, nextStage),
+	// 	buildBody(shkeptncontext, inputEvent.Project, inputEvent.Service, inputEvent.Stage), config.Spec.Paths); err != nil {
+	// 	logger.WithField("func", "handleFlatPRStrategy").WithError(err).Errorf("flat pr strategy failed on repository %s", *config.Spec.Target.Repo)
+	return keptnv2.StatusErrored, keptnv2.ResultFailed, "error while opening pull request", nil
+	// } else {
+	// 	return keptnv2.StatusSucceeded, keptnv2.ResultPass, msg, prlink
+	// }
 }
 
 func handleBranchStrategy(client repoaccess.Client, inputEvent GitPromotionTriggeredEventData, config model.PromotionConfig, shkeptncontext, nextStage string) (status keptnv2.StatusType, result keptnv2.ResultType, message string, prLink *string) {
@@ -209,29 +216,30 @@ func (a *GitPromotionTriggeredEventHandler) getNextStage(project string, stage s
 	return "production", err
 }
 
-func (a *GitPromotionTriggeredEventHandler) getMergedConfiguration(project string, stage, nextstage string, service string) (config model.PromotionConfig) {
-	data := &keptnv2.EventData{}
-	if err := keptnv2.Decode(event.Data, data); err != nil {
-		keptnHandle.Logger().Errorf("Could not parse event: %s", err.Error())
-		return false
-	}
+func (a *GitPromotionTriggeredEventHandler) getMergedConfiguration(keptnHandle sdk.IKeptn, project string, stage, nextstage string, service string) (config model.PromotionConfig) {
+	// data := &keptnv2.EventData{}
+	// if err := keptnv2.Decode(event.D, data); err != nil {
+	// 	keptnHandle.Logger().Errorf("Could not parse event: %s", err.Error())
+	// }
 
-	jcr := &config.JobConfigReader{
-		Keptn: keptn_interface.NewV1ResourceHandler(*data, keptnHandle.APIV2().Resources()),
-	}
+	// var gitPromotionConfigReader GitPromotionConfigReader
 
-	// Check if the job configuration can be found
-	configuration, _, err := jcr.GetJobConfig(event.GitCommitID)
+	// jcr := &config.GitPromotionConfigReader{
+	// 	Keptn: keptn_interface.NewV1ResourceHandler(*data, keptnHandle.APIV2().Resources()),
+	// }
 
-	config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
-		return a.api.ResourcesV1().GetProjectResource(project, configurationResource)
-	})
-	config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
-		return a.api.ResourcesV1().GetStageResource(project, stage, configurationResource)
-	})
-	config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
-		return a.api.ResourcesV1().GetServiceResource(project, stage, service, configurationResource)
-	})
+	// // Check if the job configuration can be found
+	// config, _, err := jcr.GetJobConfig(event.GitCommitID)
+
+	// config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
+	// 	return a.api.ResourcesV1().GetProjectResource(project, configurationResource)
+	// })
+	// config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
+	// 	return a.api.ResourcesV1().GetStageResource(project, stage, configurationResource)
+	// })
+	// config = readAndMergeResource(config, func() (resource *models.Resource, err error) {
+	// 	return a.api.ResourcesV1().GetServiceResource(project, stage, service, configurationResource)
+	// })
 
 	placeholders := map[string]string{
 		"project":   project,

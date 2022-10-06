@@ -89,11 +89,15 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 	}
 
 	for k, v := range newTargetFilesMap {
+		logger.WithField("func", "SyncfilesWithBranch").Infof("New Target File Map. Key: %s, Value: %s", k, v)
+		logger.WithField("func", "SyncfilesWithBranch").Infof("Current Target Files Map: %s ", currentTargetFilesMap[k])
 		var sourceRepositoryFile *RepositoryFile
 		if v, ok := currentTargetFilesMap[k]; ok {
 			sourceRepositoryFile = &v
+			logger.WithField("func", "SyncfilesWithBranch").Infof("Found current target file: %s", sourceRepositoryFile)
 		} else {
 			sourceRepositoryFile = nil
+			logger.WithField("func", "SyncfilesWithBranch").Info("Didnt Find current target file")
 		}
 		if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil {
 			return changes, err
@@ -120,8 +124,8 @@ func (c *Client) syncFile(branch string, currentFile *RepositoryFile, targetPath
 		return false, nil
 	}
 	author := &github.CommitAuthor{
-		Name:  github.String("github-actions"),
-		Email: github.String("github-actions&github.com"),
+		Name:  github.String("keptn"),
+		Email: github.String("keptn-no-reply@github.com"),
 	}
 	if targetFileContent == nil {
 		logger.WithField("func", "syncFile").Infof("deleting file %s in branch %s", currentFile.Path, branch)
@@ -140,6 +144,7 @@ func (c *Client) syncFile(branch string, currentFile *RepositoryFile, targetPath
 	} else {
 		if currentFile == nil {
 			logger.WithField("func", "syncFile").Infof("creating file %s in branch %s", targetPath, branch)
+			logger.WithField("func", "syncFile").Infof("context: %s, owner %s, repo %s, branch %s", c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository, branch)
 			if _, _, err := c.githubInstance.client.Repositories.CreateFile(c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository,
 				targetPath, &github.RepositoryContentFileOptions{
 					Message:   github.String("(build) create file"),

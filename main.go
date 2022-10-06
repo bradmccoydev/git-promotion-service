@@ -3,32 +3,25 @@ package main
 import (
 	"context"
 	"fmt"
-	"keptn/git-promotion-service/pkg/handler"
+	"keptn/git-promotion-service/pkg/eventhandler"
 	"log"
 	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
 	logger "github.com/sirupsen/logrus"
 
-	keptnapi "github.com/keptn/go-utils/pkg/api/utils"
-	api "github.com/keptn/go-utils/pkg/api/utils/v2"
 	"github.com/keptn/go-utils/pkg/lib/keptn"
-	keptncommon "github.com/keptn/go-utils/pkg/lib/keptn"
-	keptnv2 "github.com/keptn/go-utils/pkg/lib/v0_2_0"
+	"github.com/keptn/go-utils/pkg/sdk"
 )
 
 var keptnOptions = keptn.KeptnOpts{}
 var env envConfig
 
 const envVarLogLevel = "LOG_LEVEL"
-const ServiceName = "git-promotion-service"
+const serviceName = "git-promotion-service"
+const eventWildcard = "*"
 
 type envConfig struct {
 	// Port on which to listen for cloudevents
@@ -41,10 +34,13 @@ type envConfig struct {
 	KeptnAPIToken string `envconfig:"KEPTN_API_TOKEN" required:"true"`
 }
 
-// Opaque key type used for graceful shutdown context value
-type gracefulShutdownKeyType struct{}
-
-var gracefulShutdownKey = gracefulShutdownKeyType{}
+// NewEventHandler creates a new EventHandler
+func NewEventHandler() *eventhandler.EventHandler {
+	return &eventhandler.EventHandler{
+		ServiceName: serviceName,
+		Mapper:      new(eventhandler.KeptnCloudEventMapper),
+	}
+}
 
 func main() {
 	logger.SetLevel(logger.InfoLevel)
@@ -63,102 +59,26 @@ func main() {
 		log.Fatalf("Failed to process env var: %s", err)
 	}
 
-	os.Exit(_main(os.Args[1:], env))
+	_main(os.Args[1:], env)
 }
 
-func _main(args []string, env envConfig) int {
-	ctx := getGracefulContext()
-
+func _main(args []string, env envConfig) {
 	keptnOptions.ConfigurationServiceURL = fmt.Sprintf("%s/resource-service", env.KeptnAPIURL)
 
-	p, err := cloudevents.NewHTTP(cloudevents.WithPath(env.Path), cloudevents.WithPort(env.Port), cloudevents.WithGetHandlerFunc(keptnapi.HealthEndpointHandler))
-	if err != nil {
-		log.Fatalf("failed to create client, %v", err)
-	}
-	c, err := cloudevents.NewClient(p)
-	if err != nil {
-		log.Fatalf("failed to create client, %v", err)
-	}
-	log.Fatal(c.StartReceiver(ctx, gotEvent))
+	log.Printf("Starting %s...", serviceName)
+	log.Printf("on Port = %d; Path=%s", env.Port, env.Path)
 
-	return 0
-}
-
-func gotEvent(ctx context.Context, event cloudevents.Event) error {
-	ctx.Value(gracefulShutdownKey).(*sync.WaitGroup).Add(1)
-	val := ctx.Value(gracefulShutdownKey)
-	if val != nil {
-		if wg, ok := val.(*sync.WaitGroup); ok {
-			wg.Add(1)
-		}
-	}
-	go switchEvent(ctx, event)
-	return nil
-}
-
-func switchEvent(ctx context.Context, event cloudevents.Event) {
-	defer func() {
-		val := ctx.Value(gracefulShutdownKey)
-		if val == nil {
-			return
-		}
-		if wg, ok := val.(*sync.WaitGroup); ok {
-			wg.Done()
-		}
-	}()
-	keptnHandlerV2, err := keptnv2.NewKeptn(&event, keptncommon.KeptnOpts{})
-	if err != nil {
-		logger.WithError(err).Error("failed to initialize Keptn handler")
-		return
-	}
-
-	apiSet, err := api.New(os.Getenv("API_BASE_URL"), api.WithAuthToken(os.Getenv("API_AUTH_TOKEN")))
-	if err != nil {
-		logger.WithError(err).Error("failed to initialize API Set")
-		return
-	}
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		logger.WithError(err).Error("failed to initialize kube client rest")
-		return
-	}
-	kubeAPI, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		logger.WithError(err).Error("failed to initialize kube client config")
-		return
-	}
-
-	handlers := []handler.Handler{
-		handler.NewGitPromotionTriggeredEventHandler(keptnHandlerV2, apiSet, kubeAPI),
-	}
-
-	unhandled := true
-	for _, currHandler := range handlers {
-		if currHandler.IsTypeHandled(event) {
-			unhandled = false
-			currHandler.Handle(event, keptnHandlerV2)
-		}
-	}
-
-	if unhandled {
-		logger.Debugf("Received unexpected keptn event type %s", event.Type())
-	}
-}
-
-func getGracefulContext() context.Context {
-
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	wg := &sync.WaitGroup{}
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), gracefulShutdownKey, wg))
+	ctx := context.Background()
 	ctx = cloudevents.WithEncodingStructured(ctx)
-	go func() {
-		<-ch
-		logger.Fatal("Container termination triggered, starting graceful shutdown")
-		wg.Wait()
-		logger.Fatal("cancelling context")
-		cancel()
-	}()
-	return ctx
+
+	log.Printf("Creating new http handler")
+
+	// Handle all events
+	log.Fatal(sdk.NewKeptn(
+		serviceName,
+		sdk.WithTaskHandler(
+			eventWildcard,
+			NewEventHandler()),
+		sdk.WithLogger(logrus.New()),
+	).Start())
 }

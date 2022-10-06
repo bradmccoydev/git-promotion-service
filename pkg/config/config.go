@@ -15,6 +15,7 @@ const (
 
 type PromotionConfig struct {
 	APIVersion *string             `yaml:"apiVersion"`
+	Metadata   Metadata            `yaml:"metadata"`
 	Kind       *string             `yaml:"kind"`
 	Spec       PromotionConfigSpec `yaml:"spec"`
 }

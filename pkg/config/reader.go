@@ -50,18 +50,18 @@ func (jcr *GitPromotionConfigReader) FindGitPromotionConfigResource(gitCommitID 
 		return config, nil
 	}
 
-	return nil, fmt.Errorf("unable to find job configuration")
+	return nil, fmt.Errorf("unable to find git promotion configuration")
 }
 
-// GetJobConfig retrieves job/config.yaml resource from keptn and parses it into a Config struct.
+// Getgit promotionConfig retrieves job/config.yaml resource from keptn and parses it into a Config struct.
 // Additionally, also the SHA1 hash of the retrieved configuration will be returned.
 // In case of error retrieving the resource or parsing the yaml it will return (nil,
 // error) with the original error correctly wrapped in the local one
-func (jcr *GitPromotionConfigReader) GetJobConfig(gitCommitID string) (*PromotionConfig, string, error) {
+func (jcr *GitPromotionConfigReader) GetGitPromotionConfig(gitCommitID string) (*PromotionConfig, string, error) {
 
 	resource, err := jcr.FindGitPromotionConfigResource(gitCommitID)
 	if err != nil {
-		return nil, "", fmt.Errorf("error retrieving job config: %w", err)
+		return nil, "", fmt.Errorf("error retrieving git promotion config: %w", err)
 	}
 
 	hasher := sha3.New224()
