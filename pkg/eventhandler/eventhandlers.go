@@ -153,6 +153,9 @@ func (eh *EventHandler) Execute(k sdk.IKeptn, event sdk.KeptnEvent) (interface{}
 			paths = append(paths, x)
 		}
 
+		yamlPath, err := yaml.Marshal(paths)
+		k.Logger().Infof("*$* paths %s *$*", yamlPath)
+
 		p := promoter.NewFlatPrPromoter(client)
 		if msg, prlink, err := p.Promote(*config.Spec.Target.Repo, res, "main",
 			buildBranchName(data.GetStage(), nextStage, event.Shkeptncontext),

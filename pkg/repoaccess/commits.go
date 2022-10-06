@@ -1,6 +1,8 @@
 package repoaccess
 
 import (
+	"encoding/json"
+
 	"github.com/google/go-github/github"
 	logger "github.com/sirupsen/logrus"
 )
@@ -29,11 +31,13 @@ func (c *Client) GetFilesForBranch(branch, path string) (files []RepositoryFile,
 	if sourceFileContent, sourceDirContent, resp, err := c.githubInstance.client.Repositories.GetContents(c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository, path, &github.RepositoryContentGetOptions{
 		Ref: branch,
 	}); err != nil && resp.StatusCode != 404 {
+		logger.WithField("func", "GetFilesForBranch").Infof("Response Code: %d", resp.StatusCode)
 		return files, err
 	} else if resp.StatusCode == 404 {
 		return files, nil
 	} else if sourceFileContent != nil {
 		if content, err := sourceFileContent.GetContent(); err != nil {
+			logger.WithField("func", "GetFilesForBranch").Infof("Source File Content: %s", content)
 			return files, err
 		} else {
 			files = append(files, RepositoryFile{
@@ -41,7 +45,7 @@ func (c *Client) GetFilesForBranch(branch, path string) (files []RepositoryFile,
 				Path:    *sourceFileContent.Path,
 				SHA:     *sourceFileContent.SHA,
 			})
-			logger.WithField("func", "GetFilesForBranch").Infof("found file in path %s with content %s", *sourceFileContent.Path, content)
+			logger.WithField("func", "GetFilesForBranch").Infof("found file in path %s with content %s with SHA: %s", *sourceFileContent.Path, content, *sourceFileContent.SHA)
 		}
 	} else {
 		for _, sf := range sourceDirContent {
@@ -77,7 +81,12 @@ func (c *Client) GetFilesForBranch(branch, path string) (files []RepositoryFile,
 
 func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTargetFiles []RepositoryFile) (changes int, err error) {
 	changes = 0
+
+	currentTargetFilesString, err := json.Marshal(currentTargetFiles)
+	newTargetFilesString, err := json.Marshal(newTargetFiles)
 	logger.WithField("func", "SyncfilesWithBranch").Infof("starting for branch %s and %d currentTargetFiles and %d newTargetFiles", branch, len(currentTargetFiles), len(newTargetFiles))
+	logger.WithField("func", "SyncfilesWithBranch").Infof("currentTargetFiles: %s", currentTargetFilesString)
+	logger.WithField("func", "SyncfilesWithBranch").Infof("newTargetFiles: %s", newTargetFilesString)
 
 	newTargetFilesMap := make(map[string]RepositoryFile)
 	for _, f := range newTargetFiles {
@@ -92,12 +101,13 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 		logger.WithField("func", "SyncfilesWithBranch").Infof("New Target File Map. Key: %s, Value: %s", k, v)
 		logger.WithField("func", "SyncfilesWithBranch").Infof("Current Target Files Map: %s ", currentTargetFilesMap[k])
 		var sourceRepositoryFile *RepositoryFile
+		logger.WithField("func", "SyncfilesWithBranch").Infof("#Looking to see if v=k: v: %s k: %s ", v, currentTargetFilesMap[k])
 		if v, ok := currentTargetFilesMap[k]; ok {
 			sourceRepositoryFile = &v
 			logger.WithField("func", "SyncfilesWithBranch").Infof("Found current target file: %s", sourceRepositoryFile)
 		} else {
 			sourceRepositoryFile = nil
-			logger.WithField("func", "SyncfilesWithBranch").Info("Didnt Find current target file")
+			logger.WithField("func", "SyncfilesWithBranch").Infof("Didnt Find current target file, values where %s and %s", v, currentTargetFilesMap[k])
 		}
 		if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil {
 			return changes, err
@@ -144,7 +154,7 @@ func (c *Client) syncFile(branch string, currentFile *RepositoryFile, targetPath
 	} else {
 		if currentFile == nil {
 			logger.WithField("func", "syncFile").Infof("creating file %s in branch %s", targetPath, branch)
-			logger.WithField("func", "syncFile").Infof("context: %s, owner %s, repo %s, branch %s", c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository, branch)
+			logger.WithField("func", "syncFile").Infof("context: %s, owner %s, repo %s, branch %s content %s", c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository, branch, *targetFileContent)
 			if _, _, err := c.githubInstance.client.Repositories.CreateFile(c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository,
 				targetPath, &github.RepositoryContentFileOptions{
 					Message:   github.String("(build) create file"),

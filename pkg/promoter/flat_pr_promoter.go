@@ -1,6 +1,7 @@
 package promoter
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"keptn/git-promotion-service/pkg/model"
@@ -39,28 +40,44 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 		} else {
 			path = *p.Source
 		}
+
+		logger.WithField("func", "manageFlatPRStrategy").Infof("Getting Files for branch %s path %s", sourceBranch, path)
 		pNewTargetFiles, err := promoter.client.GetFilesForBranch(sourceBranch, path)
 		if err != nil {
+			logger.WithField("func", "manageFlatPRStrategy").Infof("Couldnt get files for branch %s path %s", sourceBranch, path)
 			return "", nil, err
 		}
 		var pCurrentTargetFiles []repoaccess.RepositoryFile
 		if p.Source != nil {
 			if pCurrentTargetFiles, err = promoter.client.GetFilesForBranch(sourceBranch, *p.Target); err != nil {
+				logger.WithField("func", "manageFlatPRStrategy").Infof("p.Source != nil and err in GetFilesforBranch branch: %s target %s", sourceBranch, *p.Target)
 				return "", nil, err
 			}
 		} else {
+			logger.WithField("func", "manageFlatPRStrategy").Infof("pCurrentTargetFiles %s pNewTargetFiles %s", pCurrentTargetFiles, pNewTargetFiles)
 			pCurrentTargetFiles = pNewTargetFiles
 		}
+		pCurrentTargetFilesJSON, err := json.Marshal(pCurrentTargetFiles)
+		pNewTargetFilesJSON, err := json.Marshal(pNewTargetFiles)
+
+		logger.WithField("func", "manageFlatPRStrategy").Infof("pCurrentTargetFilesJSON %s", pCurrentTargetFilesJSON)
+		logger.WithField("func", "manageFlatPRStrategy").Infof("pNewTargetFiles %s", pNewTargetFilesJSON)
+
 		for i, c := range pNewTargetFiles {
 			pNewTargetFiles[i].Content = replacer.Replace(c.Content, fields)
 			if p.Source != nil {
 				pNewTargetFiles[i].Path = strings.Replace(pNewTargetFiles[i].Path, *p.Source, *p.Target, -1)
 			}
 		}
+
+		// pNewTargetFilesJSON, err = json.Marshal(pNewTargetFiles)
+		// logger.WithField("func", "manageFlatPRStrategy").Infof("Modified %s", pNewTargetFilesJSON)
+
 		if checkForChanges(pNewTargetFiles, pCurrentTargetFiles) {
 			if pathChanges, err := promoter.client.SyncFilesWithBranch(targetBranch, pCurrentTargetFiles, pNewTargetFiles); err != nil {
 				return "", nil, err
 			} else {
+				logger.WithField("func", "manageFlatPRStrategy").Info("There were changes")
 				changes += pathChanges
 			}
 		} else {
