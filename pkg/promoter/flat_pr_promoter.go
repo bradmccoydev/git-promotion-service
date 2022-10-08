@@ -42,6 +42,7 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 		}
 
 		logger.WithField("func", "manageFlatPRStrategy").Infof("Getting Files for branch %s path %s", sourceBranch, path)
+		//LOG: "Getting Files for branch main path /kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml"
 		pNewTargetFiles, err := promoter.client.GetFilesForBranch(sourceBranch, path)
 		if err != nil {
 			logger.WithField("func", "manageFlatPRStrategy").Infof("Couldnt get files for branch %s path %s", sourceBranch, path)
@@ -70,8 +71,8 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 			}
 		}
 
-		// pNewTargetFilesJSON, err = json.Marshal(pNewTargetFiles)
-		// logger.WithField("func", "manageFlatPRStrategy").Infof("Modified %s", pNewTargetFilesJSON)
+		changedpNewTargetFilesJSON, err := json.Marshal(pNewTargetFiles)
+		logger.WithField("func", "manageFlatPRStrategy").Infof("Modified %s", changedpNewTargetFilesJSON)
 
 		if checkForChanges(pNewTargetFiles, pCurrentTargetFiles) {
 			if pathChanges, err := promoter.client.SyncFilesWithBranch(targetBranch, pCurrentTargetFiles, pNewTargetFiles); err != nil {
