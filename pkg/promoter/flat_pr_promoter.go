@@ -62,7 +62,9 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 		pNewTargetFilesJSON, err := json.Marshal(pNewTargetFiles)
 
 		logger.WithField("func", "manageFlatPRStrategy").Infof("pCurrentTargetFilesJSON %s", pCurrentTargetFilesJSON)
+		//LOG: "pCurrentTargetFilesJSON null"
 		logger.WithField("func", "manageFlatPRStrategy").Infof("pNewTargetFiles %s", pNewTargetFilesJSON)
+		//LOG: "pNewTargetFiles [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.7\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml\",\"SHA\":\"6f244d800c062740187b1893b2d41551c94ae02a\"}]
 
 		for i, c := range pNewTargetFiles {
 			pNewTargetFiles[i].Content = replacer.Replace(c.Content, fields)

@@ -97,8 +97,9 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 	newTargetFilesString, err := json.Marshal(newTargetFiles)
 	logger.WithField("func", "SyncfilesWithBranch").Infof("starting for branch %s and %d currentTargetFiles and %d newTargetFiles", branch, len(currentTargetFiles), len(newTargetFiles))
 	logger.WithField("func", "SyncfilesWithBranch").Infof("currentTargetFiles: %s", currentTargetFilesString)
-	//LOG: "currentTargetFiles: null"
+	//LOG: "currentTargetFiles: [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.5\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml\",\"SHA\":\"5d35811e14d7aa9f9eccd9739ae5e89683a08cd7\"}]"
 	logger.WithField("func", "SyncfilesWithBranch").Infof("newTargetFiles: %s", newTargetFilesString)
+	//LOG: "newTargetFiles: [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.7\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml\",\"SHA\":\"6f244d800c062740187b1893b2d41551c94ae02a\"}]"
 
 	newTargetFilesMap := make(map[string]RepositoryFile)
 	for _, f := range newTargetFiles {
@@ -109,20 +110,26 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 		currentTargetFilesMap[f.Path] = f
 	}
 
+	updatedNewTargetFilesMap, err := json.Marshal(newTargetFilesMap)
+	logger.WithField("func", "SyncfilesWithBranch").Infof("updatedNewTargetFilesMap: %s ", updatedNewTargetFilesMap)
 	updatedCurrentTargetFilesMap, err := json.Marshal(currentTargetFilesMap)
 	logger.WithField("func", "SyncfilesWithBranch").Infof("updatedCurrentTargetFilesMap: %s ", updatedCurrentTargetFilesMap)
-	//LOG: "updatedCurrentTargetFilesMap: {\"kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml\":{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.6\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml\",\"SHA\":\"986f86ab13dafe2a1008c957364559e3e6b34088\"}} "
+	//LOG: "updatedCurrentTargetFilesMap: {\"kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml\":{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.5\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml\",\"SHA\":\"5d35811e14d7aa9f9eccd9739ae5e89683a08cd7\"}} "
 	for k, v := range newTargetFilesMap {
 		logger.WithField("func", "SyncfilesWithBranch").Infof("New Target File Map. Key: %s, Value: %s", k, v)
 		//LOG: "New Target File Map. Key: kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml, Value: {apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a}"
 		logger.WithField("func", "SyncfilesWithBranch").Infof("Current Target Files Map: %s ", currentTargetFilesMap)
 		//LOG: "Current Target Files Map: map[kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml:{apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.6\n kube-infra/kustomize/podtato-head/podtato-head/envs/prod/version.yaml 986f86ab13dafe2a1008c957364559e3e6b34088}] "
 		logger.WithField("func", "SyncfilesWithBranch").Infof("New Target Files Map: %s ", newTargetFilesMap)
-		//LOG: "New Target Files Map: map[kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml:{apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a}]"
+		//LOG: "New Target Files Map: map[kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml:{apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a}] "
 
 		var sourceRepositoryFile *RepositoryFile
+		// sourceRepositoryFile.SHA = ""
+		// sourceRepositoryFile.Path =
+		// sourceRepositoryFile.Content = x.Content
+
 		logger.WithField("func", "SyncfilesWithBranch").Infof("#Looking to see if v=k: v: %s k: %s ", v, currentTargetFilesMap[k])
-		//LOG: "#Looking to see if v=k: v: {apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a} k: {  }""
+		//LOG: #Looking to see if v=k: v: {apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a} k: {  } "
 		if v, ok := currentTargetFilesMap[k]; ok {
 			//LOG: v: {apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a}
 			//LOG: k: {  }
@@ -133,7 +140,9 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 			logger.WithField("func", "SyncfilesWithBranch").Infof("Didnt Find current target file, values where %s and %s", v, currentTargetFilesMap[k])
 			//LOG: "Didnt Find current target file, values where {  } and {  }"
 		}
-		if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil { //target path should be prod
+
+		if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil {
+			//if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil { //target path should be prod
 			logger.WithField("func", "SyncfilesWithBranch").Infof("Couldnt SyncFile: %s", err.Error())
 			return changes, err
 		} else if changed {
