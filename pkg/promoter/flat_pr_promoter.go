@@ -22,7 +22,7 @@ func NewFlatPrPromoter(client repoaccess.Client) FlatPrPromoter {
 
 func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]string, sourceBranch, targetBranch, title, body string, paths []model.Path) (message string, prLink *string, err error) {
 	logger.WithField("func", "manageFlatPRStrategy").Infof("starting flat pr strategy with sourceBranch %s and targetBranch %s and fields %v", sourceBranch, targetBranch, fields)
-
+	//"starting flat pr strategy with sourceBranch main and targetBranch promote/integration-test_production-b0501292-d94d-4149-a98d-406aca2b9473 and fields map[data.data.message: data.data.project:ortelius data.data.result:pass data.data.service:podtatohead data.data.stage:integration-test data.data.status:succeeded data.data.temporaryData.distributor.subscriptionID:71b1a157-2da1-4a97-91d7-8759f4997473 data.gitcommitid:173c84a53f6d0ce87d455de6fff3b15364eb5485 data.id:3c784266-4146-4387-819d-f5a3be6292b6 data.shkeptncontext:b0501292-d94d-4149-a98d-406aca2b9473 data.source:0xc00019e4a0 data.specversion:1.0 data.time:2022-10-11 07:07:35.695714903 +0000 UTC data.type:0xc00019e4b0 id:3c784266-4146-4387-819d-f5a3be6292b6 source:shipyard-controller specversion:1.0]"
 	if exists, err := promoter.client.BranchExists(targetBranch); err != nil {
 		return "", nil, err
 	} else if exists {
@@ -33,6 +33,7 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 	}
 	changes := 0
 	logger.WithField("func", "manageFlatPRStrategy").Infof("processing %d paths", len(paths))
+	//"processing 1 paths"
 	for _, p := range paths {
 		var path string
 		if p.Source == nil {
@@ -42,7 +43,7 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 		}
 
 		logger.WithField("func", "manageFlatPRStrategy").Infof("Getting Files for branch %s path %s", sourceBranch, path)
-		//LOG: "Getting Files for branch main path /kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml"
+		//"Getting Files for branch main path /kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml"
 		pNewTargetFiles, err := promoter.client.GetFilesForBranch(sourceBranch, path)
 		if err != nil {
 			logger.WithField("func", "manageFlatPRStrategy").Infof("Couldnt get files for branch %s path %s", sourceBranch, path)
@@ -62,9 +63,9 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 		pNewTargetFilesJSON, err := json.Marshal(pNewTargetFiles)
 
 		logger.WithField("func", "manageFlatPRStrategy").Infof("pCurrentTargetFilesJSON %s", pCurrentTargetFilesJSON)
-		//LOG: "pCurrentTargetFilesJSON null"
+		//"pCurrentTargetFilesJSON [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.5\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/qa/version.yaml\",\"SHA\":\"5d35811e14d7aa9f9eccd9739ae5e89683a08cd7\"}]"
 		logger.WithField("func", "manageFlatPRStrategy").Infof("pNewTargetFiles %s", pNewTargetFilesJSON)
-		//LOG: "pNewTargetFiles [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.7\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/dev/version.yaml\",\"SHA\":\"6f244d800c062740187b1893b2d41551c94ae02a\"}]
+		//"pNewTargetFiles [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.7\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml\",\"SHA\":\"6f244d800c062740187b1893b2d41551c94ae02a\"}]"
 
 		for i, c := range pNewTargetFiles {
 			pNewTargetFiles[i].Content = replacer.Replace(c.Content, fields)
@@ -75,6 +76,7 @@ func (promoter FlatPrPromoter) Promote(repositoryUrl string, fields map[string]s
 
 		changedpNewTargetFilesJSON, err := json.Marshal(pNewTargetFiles)
 		logger.WithField("func", "manageFlatPRStrategy").Infof("Modified %s", changedpNewTargetFilesJSON)
+		//"Modified [{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.7\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml\",\"SHA\":\"6f244d800c062740187b1893b2d41551c94ae02a\"}]"
 
 		if checkForChanges(pNewTargetFiles, pCurrentTargetFiles) {
 			if pathChanges, err := promoter.client.SyncFilesWithBranch(targetBranch, pCurrentTargetFiles, pNewTargetFiles); err != nil {

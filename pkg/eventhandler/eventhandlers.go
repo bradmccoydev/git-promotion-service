@@ -155,6 +155,7 @@ func (eh *EventHandler) Execute(k sdk.IKeptn, event sdk.KeptnEvent) (interface{}
 
 		yamlPath, err := yaml.Marshal(paths)
 		k.Logger().Infof("*$* paths %s *$*", yamlPath)
+		//"*$* paths - source: /kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml\n  target: /kube-infra/kustomize/podtato-head/podtato-head/envs/qa/version.yaml\n *$*"
 
 		p := promoter.NewFlatPrPromoter(client)
 		if msg, prlink, err := p.Promote(*config.Spec.Target.Repo, res, "main",
@@ -162,7 +163,9 @@ func (eh *EventHandler) Execute(k sdk.IKeptn, event sdk.KeptnEvent) (interface{}
 			buildTitle(event.Shkeptncontext, nextStage),
 			buildBody(event.Shkeptncontext, data.GetProject(), data.GetService(), data.GetStage()), paths); err != nil {
 			log.Printf("flat pr strategy failed on repository %s Message %s", *config.Spec.Target.Repo, msg)
+			//flat pr strategy failed on repository https://github.com/ortelius/ortelius-kubernetes
 			k.Logger().Errorf("Error while opening PR: %s", err.Error())
+			//"Error while opening PR: PUT https://api.github.com/repos/ortelius/ortelius-kubernetes/contents/kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml: 422 Invalid request.\n\n\"sha\"
 		} else {
 			log.Printf("PR Done %s", *prlink)
 		}
