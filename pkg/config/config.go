@@ -25,9 +25,10 @@ type Metadata struct {
 }
 
 type PromotionConfigSpec struct {
-	Strategy *string `yaml:"strategy"`
-	Target   Target  `yaml:"target"`
-	Paths    []Path  `yaml:"paths"`
+	Strategy  *string `yaml:"strategy"`
+	NextStage *string `yaml:"nextStage"`
+	Target    Target  `yaml:"target"`
+	Paths     []Path  `yaml:"paths"`
 }
 
 type Target struct {

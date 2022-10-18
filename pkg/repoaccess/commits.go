@@ -134,9 +134,10 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 		//"New Target Files Map: map[kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml:{apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a}] "
 
 		var sourceRepositoryFile *RepositoryFile
-		// sourceRepositoryFile.SHA = ""
-		// sourceRepositoryFile.Path =
-		// sourceRepositoryFile.Content = x.Content
+		// var sourceRepositoryFile1 *RepositoryFile
+		// sourceRepositoryFile1.SHA = "5d35811e14d7aa9f9eccd9739ae5e89683a08cd7"
+		// sourceRepositoryFile1.Path = "kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml"
+		// sourceRepositoryFile1.Content = "[{\"Content\":\"apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: podtato-head-left-arm\\nspec:\\n  template:\\n    spec:\\n      containers:\\n      - name: podtato-head-left-arm\\n        image: ghcr.io/podtato-head/left-arm:0.2.5\\n\",\"Path\":\"kube-infra/kustomize/podtato-head/podtato-head/envs/qa/version.yaml\",\"SHA\":\"5d35811e14d7aa9f9eccd9739ae5e89683a08cd7\"}]"
 
 		logger.WithField("func", "SyncfilesWithBranch").Infof("#Looking to see if v=k: v: %s k: %s ", v, currentTargetFilesMap[k])
 		//"#Looking to see if v=k: v: {apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: podtato-head-left-arm\nspec:\n  template:\n    spec:\n      containers:\n      - name: podtato-head-left-arm\n        image: ghcr.io/podtato-head/left-arm:0.2.7\n kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml 6f244d800c062740187b1893b2d41551c94ae02a} k: {  } "
@@ -151,9 +152,18 @@ func (c *Client) SyncFilesWithBranch(branch string, currentTargetFiles, newTarge
 			//LOG: "Didnt Find current target file, values where {  } and {  }"
 		}
 
+		// test, err := c.syncFile(branch, sourceRepositoryFile, "kube-infra/kustomize/podtato-head/podtato-head/envs/qa/version.yaml", &v.Content)
+		// if err != nil {
+		// 	logger.WithField("func", "SyncfilesWithBranch").Infof("My Test %t error: %s", test, err.Error())
+		// }
+
+		//logger.WithField("func", "SyncfilesWithBranch").Infof("Did it work %t ", test)
+
 		if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil {
-			//if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil { //target path should be prod
-			logger.WithField("func", "SyncfilesWithBranch").Infof("Couldnt SyncFile: %s", err.Error())
+			if changed, err := c.syncFile(branch, sourceRepositoryFile, k, &v.Content); err != nil { //target path should be prod
+				logger.WithField("func", "SyncfilesWithBranch").Infof("Couldnt SyncFile: %s", err.Error())
+				logger.WithField("func", "SyncfilesWithBranch").Infof("Its Changed: %t", changed)
+			}
 			//"Couldnt SyncFile: PUT https://api.github.com/repos/ortelius/ortelius-kubernetes/contents/kube-infra/kustomize/podtato-head/podtato-head/envs/int/version.yaml: 422 Invalid request.\n\n\"sha\" wasn't supplied. []"
 			return changes, err
 		} else if changed {
@@ -186,6 +196,7 @@ func (c *Client) syncFile(branch string, currentFile *RepositoryFile, targetPath
 		Name:  github.String("keptn"),
 		Email: github.String("keptn-no-reply@github.com"),
 	}
+
 	if targetFileContent == nil {
 		logger.WithField("func", "syncFile").Infof("deleting file %s in branch %s", currentFile.Path, branch)
 		if _, _, err := c.githubInstance.client.Repositories.DeleteFile(c.githubInstance.context, c.githubInstance.owner, c.githubInstance.repository,
